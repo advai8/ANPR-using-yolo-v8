@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NexTransit — Smart Campus Transport</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #030a1a;
+    --navy2: #060f24;
+    --navy3: #0a1632;
+    --cyan: #00f5ff;
+    --cyan2: #00c8d4;
+    --cyan3: #007a8a;
+    --glow: 0 0 20px rgba(0,245,255,0.4), 0 0 40px rgba(0,245,255,0.15);
+    --glow-sm: 0 0 10px rgba(0,245,255,0.3);
+    --glass: rgba(0,245,255,0.05);
+    --glass-border: rgba(0,245,255,0.15);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Rajdhani', sans-serif; background: var(--navy); color: #e0f7fa; min-height: 100vh; overflow-x: hidden; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--navy); }
+  ::-webkit-scrollbar-thumb { background: var(--cyan3); border-radius: 2px; }
+
+  /* ── PAGES ── */
+  .page { display: none; min-height: 100vh; }
+  .page.active { display: flex; flex-direction: column; }
+
+  /* ── LANDING ── */
+  #landing { position: relative; align-items: center; justify-content: center; background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,245,255,0.08) 0%, transparent 70%), var(--navy); overflow: hidden; }
+  .grid-bg { position: absolute; inset: 0; background-image: linear-gradient(rgba(0,245,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,245,255,0.04) 1px, transparent 1px); background-size: 60px 60px; animation: gridPan 20s linear infinite; pointer-events: none; }
+  @keyframes gridPan { 0% { background-position: 0 0; } 100% { background-position: 60px 60px; } }
+  .scanline { position: absolute; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, rgba(0,245,255,0.5), transparent); animation: scanDown 6s linear infinite; pointer-events: none; }
+  @keyframes scanDown { 0% { top: -2px; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+  .orb { position: absolute; border-radius: 50%; filter: blur(80px); pointer-events: none; }
+  .orb1 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(0,245,255,0.12) 0%, transparent 70%); top: -150px; left: -150px; animation: orbPulse 8s ease-in-out infinite; }
+  .orb2 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(0,120,200,0.1) 0%, transparent 70%); bottom: -100px; right: -100px; animation: orbPulse 10s ease-in-out infinite reverse; }
+  @keyframes orbPulse { 0%, 100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.2); opacity: 1; } }
+  .logo-badge { border: 1px solid var(--glass-border); background: var(--glass); backdrop-filter: blur(10px); border-radius: 999px; padding: 6px 20px; font-family: 'Orbitron', monospace; font-size: 11px; letter-spacing: 3px; color: var(--cyan); text-transform: uppercase; box-shadow: var(--glow-sm); animation: fadeSlideDown 1s ease both; }
+  .hero-title { font-family: 'Orbitron', monospace; font-size: clamp(2.8rem, 8vw, 5.5rem); font-weight: 900; line-height: 1; animation: fadeSlideUp 1s 0.2s ease both; opacity: 0; animation-fill-mode: forwards; }
+  .hero-title .line1 { color: #fff; }
+  .hero-title .line2 { background: linear-gradient(90deg, var(--cyan), #0080ff, var(--cyan)); background-size: 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: shimmer 3s linear infinite; }
+  @keyframes shimmer { 0% { background-position: 0% center; } 100% { background-position: 200% center; } }
+  .hero-sub { font-size: 1.1rem; color: rgba(200,240,255,0.6); letter-spacing: 2px; text-transform: uppercase; animation: fadeSlideUp 1s 0.5s ease both; opacity: 0; animation-fill-mode: forwards; }
+  @keyframes fadeSlideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  .btn-enter { position: relative; display: inline-flex; align-items: center; gap: 10px; padding: 16px 48px; font-family: 'Orbitron', monospace; font-size: 14px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--navy); background: linear-gradient(135deg, var(--cyan), var(--cyan2)); border: none; border-radius: 4px; cursor: pointer; overflow: hidden; animation: fadeSlideUp 1s 0.7s ease both; opacity: 0; animation-fill-mode: forwards; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 0 30px rgba(0,245,255,0.5), 0 0 60px rgba(0,245,255,0.2); }
+  .btn-enter:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 0 50px rgba(0,245,255,0.7), 0 0 100px rgba(0,245,255,0.3); }
+  .btn-enter::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent); animation: btnShine 3s linear infinite; }
+  @keyframes btnShine { 0% { left: -100%; } 40%, 100% { left: 100%; } }
+  .stat-row { display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; animation: fadeSlideUp 1s 0.9s ease both; opacity: 0; animation-fill-mode: forwards; }
+  .stat-num { font-family: 'Orbitron', monospace; font-size: 1.8rem; font-weight: 700; color: var(--cyan); text-shadow: var(--glow-sm); }
+  .stat-label { font-size: 0.7rem; letter-spacing: 2px; color: rgba(200,240,255,0.4); text-transform: uppercase; }
+  .stat-divider { width: 1px; background: var(--glass-border); }
+
+  /* ── LOGIN ── */
+  #login { align-items: center; justify-content: center; background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(0,245,255,0.05) 0%, transparent 70%), var(--navy); padding: 20px; }
+  .glass-card { background: rgba(6,15,36,0.85); backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius: 16px; box-shadow: 0 0 40px rgba(0,245,255,0.1), inset 0 1px 0 rgba(0,245,255,0.1); }
+  .input-field { width: 100%; background: rgba(0,245,255,0.04); border: 1px solid rgba(0,245,255,0.15); border-radius: 8px; padding: 12px 16px; color: #e0f7fa; font-family: 'Rajdhani', sans-serif; font-size: 1rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+  .input-field::placeholder { color: rgba(200,240,255,0.3); }
+  .input-field:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(0,245,255,0.1); }
+  .label-text { font-size: 0.72rem; letter-spacing: 2px; text-transform: uppercase; color: var(--cyan2); margin-bottom: 6px; display: block; }
+  .btn-primary { width: 100%; padding: 14px; font-family: 'Orbitron', monospace; font-size: 13px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--navy); background: linear-gradient(135deg, var(--cyan), var(--cyan2)); border: none; border-radius: 8px; cursor: pointer; transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s; box-shadow: 0 0 20px rgba(0,245,255,0.4); position: relative; overflow: hidden; }
+  .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 30px rgba(0,245,255,0.6); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .error-box { background: rgba(255,50,50,0.1); border: 1px solid rgba(255,80,80,0.3); color: #ff8080; border-radius: 8px; padding: 10px 14px; font-size: 0.875rem; display: none; }
+
+  /* ── DASHBOARD ── */
+  #dashboard { flex-direction: row; position: relative; }
+  .sidebar { width: 260px; min-height: 100vh; background: rgba(6,15,36,0.97); border-right: 1px solid var(--glass-border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; z-index: 100; transition: transform 0.3s cubic-bezier(.4,0,.2,1); backdrop-filter: blur(20px); }
+  .sidebar-header { padding: 24px 20px; border-bottom: 1px solid var(--glass-border); }
+  .sidebar-logo { font-family: 'Orbitron', monospace; font-size: 1.1rem; font-weight: 900; color: var(--cyan); text-shadow: var(--glow-sm); letter-spacing: 1px; }
+  .sidebar-sub { font-size: 0.63rem; letter-spacing: 2px; color: rgba(200,240,255,0.3); text-transform: uppercase; margin-top: 2px; }
+  .sidebar-nav { flex: 1; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; letter-spacing: 0.5px; color: rgba(200,240,255,0.45); transition: all 0.2s; border: 1px solid transparent; user-select: none; }
+  .nav-item:hover { color: var(--cyan); background: rgba(0,245,255,0.05); border-color: rgba(0,245,255,0.1); }
+  .nav-item.active { color: var(--navy); background: linear-gradient(135deg, var(--cyan), var(--cyan2)); border-color: transparent; box-shadow: 0 0 15px rgba(0,245,255,0.3); }
+  .nav-item .icon { font-size: 1.1rem; }
+  .sidebar-footer { padding: 16px 12px; border-top: 1px solid var(--glass-border); }
+  .logout-btn { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; color: rgba(255,100,100,0.7); transition: all 0.2s; border: 1px solid transparent; width: 100%; background: none; font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px; }
+  .logout-btn:hover { color: #ff6060; background: rgba(255,50,50,0.07); border-color: rgba(255,50,50,0.15); }
+  .main-content { margin-left: 260px; flex: 1; padding: 28px; background: var(--navy); min-height: 100vh; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+  .topbar-title { font-family: 'Orbitron', monospace; font-size: 1.4rem; font-weight: 700; color: #fff; }
+  .topbar-time { font-family: 'Orbitron', monospace; font-size: 0.8rem; color: var(--cyan); opacity: 0.7; }
+  .hamburger { display: none; background: none; border: 1px solid var(--glass-border); border-radius: 8px; padding: 8px 10px; cursor: pointer; color: var(--cyan); font-size: 1.2rem; align-items: center; }
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 99; backdrop-filter: blur(2px); }
+
+  /* ── KPI CARDS ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .kpi-card { background: rgba(6,15,36,0.85); border: 1px solid var(--glass-border); border-radius: 12px; padding: 22px; position: relative; overflow: hidden; transition: box-shadow 0.3s, transform 0.3s; backdrop-filter: blur(10px); }
+  .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--cyan), transparent); }
+  .kpi-card:hover { box-shadow: 0 0 25px rgba(0,245,255,0.15); transform: translateY(-2px); }
+  .kpi-label { font-size: 0.68rem; letter-spacing: 2px; text-transform: uppercase; color: rgba(200,240,255,0.38); margin-bottom: 8px; }
+  .kpi-value { font-family: 'Orbitron', monospace; font-size: 2rem; font-weight: 700; color: var(--cyan); text-shadow: var(--glow-sm); }
+  .kpi-sub { font-size: 0.8rem; color: rgba(200,240,255,0.3); margin-top: 4px; }
+  .kpi-icon { position: absolute; top: 16px; right: 16px; font-size: 1.6rem; opacity: 0.13; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+  .badge-entry { background: rgba(0,255,128,0.1); border: 1px solid rgba(0,255,128,0.3); color: #00ff80; }
+  .badge-exit  { background: rgba(255,50,50,0.1);  border: 1px solid rgba(255,80,80,0.3);  color: #ff6060; }
+  .badge-inside{ background: rgba(0,245,255,0.1);  border: 1px solid rgba(0,245,255,0.3);  color: var(--cyan); }
+
+  /* ── CHART CARD ── */
+  .chart-card { background: rgba(6,15,36,0.85); border: 1px solid var(--glass-border); border-radius: 12px; padding: 24px; backdrop-filter: blur(10px); position: relative; overflow: hidden; }
+  .chart-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--cyan), transparent); }
+  .section-title { font-family: 'Orbitron', monospace; font-size: 0.82rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--cyan2); margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--glass-border), transparent); }
+
+  /* ── LOGS ── */
+  .table-wrap { background: rgba(6,15,36,0.85); border: 1px solid var(--glass-border); border-radius: 12px; overflow: hidden; backdrop-filter: blur(10px); }
+  .logs-table { width: 100%; border-collapse: collapse; }
+  .logs-table th { font-size: 0.63rem; letter-spacing: 2px; text-transform: uppercase; color: rgba(200,240,255,0.3); padding: 14px 20px; text-align: left; background: rgba(0,245,255,0.03); border-bottom: 1px solid var(--glass-border); }
+  .logs-table td { padding: 14px 20px; border-bottom: 1px solid rgba(0,245,255,0.04); font-size: 0.9rem; color: rgba(200,240,255,0.7); transition: all 0.2s; }
+  .logs-table tr:hover td { background: rgba(0,245,255,0.03); color: #e0f7fa; }
+  .logs-table tr:last-child td { border-bottom: none; }
+  .filter-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  .filter-input { background: rgba(0,245,255,0.04); border: 1px solid rgba(0,245,255,0.15); border-radius: 8px; padding: 10px 14px; color: #e0f7fa; font-family: 'Rajdhani', sans-serif; font-size: 0.9rem; outline: none; transition: border-color 0.2s; }
+  .filter-input:focus { border-color: var(--cyan); }
+  .filter-input option { background: var(--navy3); }
+
+  /* ── DRIVER CARD ── */
+  .driver-card { background: rgba(6,15,36,0.85); border: 1px solid var(--glass-border); border-radius: 16px; padding: 32px; max-width: 480px; backdrop-filter: blur(10px); position: relative; overflow: hidden; }
+  .driver-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--cyan), transparent); }
+  .avatar { width: 90px; height: 90px; border-radius: 50%; background: linear-gradient(135deg, rgba(0,245,255,0.12), rgba(0,120,200,0.12)); border: 2px solid var(--glass-border); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; box-shadow: 0 0 20px rgba(0,245,255,0.1); margin-bottom: 20px; }
+  .driver-name-display { font-family: 'Orbitron', monospace; font-size: 1.3rem; font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .driver-detail { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(0,245,255,0.07); }
+  .driver-detail:last-of-type { border-bottom: none; }
+  .detail-label { font-size: 0.68rem; letter-spacing: 2px; text-transform: uppercase; color: rgba(200,240,255,0.3); width: 100px; flex-shrink: 0; }
+  .detail-value { font-family: 'Orbitron', monospace; font-size: 0.9rem; color: var(--cyan); }
+
+  /* ── SETTINGS CARD ── */
+  .settings-card { background: rgba(6,15,36,0.85); border: 1px solid var(--glass-border); border-radius: 12px; padding: 28px; max-width: 500px; backdrop-filter: blur(10px); position: relative; overflow: hidden; }
+  .settings-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--cyan), transparent); }
+
+  /* ── TABS ── */
+  .sub-page { display: none; }
+  .sub-page.active { display: block; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── MISC ── */
+  .spinner { width: 36px; height: 36px; border: 3px solid rgba(0,245,255,0.15); border-top-color: var(--cyan); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .pulse-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .pulse-green { background: #00ff80; box-shadow: 0 0 8px #00ff80; animation: blinkAnim 2s ease infinite; }
+  .pulse-red   { background: #ff6060; box-shadow: 0 0 8px #ff6060; }
+  @keyframes blinkAnim { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .refresh-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 0.68rem; letter-spacing: 1px; color: rgba(0,245,255,0.4); background: rgba(0,245,255,0.05); border: 1px solid rgba(0,245,255,0.1); border-radius: 999px; padding: 4px 10px; }
+  .no-data { text-align: center; padding: 48px; color: rgba(200,240,255,0.2); font-size: 0.85rem; letter-spacing: 1px; }
+  .page-header-wrap { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
+  .clear-btn { background: rgba(0,245,255,0.06); border: 1px solid rgba(0,245,255,0.15); border-radius: 8px; padding: 10px 16px; color: var(--cyan); font-family: 'Rajdhani', sans-serif; font-size: 0.85rem; cursor: pointer; letter-spacing: 1px; transition: background 0.2s; }
+  .clear-btn:hover { background: rgba(0,245,255,0.12); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); box-shadow: 0 0 60px rgba(0,0,0,0.9); }
+    .overlay.open { display: block; }
+    .main-content { margin-left: 0; padding: 16px; }
+    .hamburger { display: flex !important; }
+    .topbar-time { display: none; }
+    .kpi-grid { grid-template-columns: 1fr 1fr; }
+    .filter-row { flex-direction: column; }
+    .filter-input { width: 100%; }
+    .logs-table { font-size: 0.78rem; }
+    .logs-table th, .logs-table td { padding: 10px 12px; }
+  }
+  @media (max-width: 480px) {
+    .kpi-grid { grid-template-columns: 1fr; }
+    .stat-divider { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════
+     LANDING
+════════════════════════════════════ -->
+<div id="landing" class="page active">
+  <div class="grid-bg"></div>
+  <div class="scanline"></div>
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div style="position:relative;z-index:1;text-align:center;max-width:700px;padding:40px 24px;display:flex;flex-direction:column;align-items:center;gap:28px;">
+    <div class="logo-badge">⬡ Smart Campus Transport System v2.0</div>
+    <div class="hero-title">
+      <div class="line1">NEX</div>
+      <div class="line2">TRANSIT</div>
+    </div>
+    <p class="hero-sub">Real-Time Vehicle Intelligence Platform</p>
+    <p style="color:rgba(200,240,255,0.42);font-size:1rem;line-height:1.9;max-width:480px;animation:fadeSlideUp 1s 0.6s ease both;opacity:0;animation-fill-mode:forwards;">
+      Monitor campus vehicle movements, track entry/exit events, and gain operational intelligence — unified in one command portal.
+    </p>
+    <button class="btn-enter" onclick="showPage('login')">
+      <span>Enter Portal</span>
+      <span style="font-size:1rem;">→</span>
+    </button>
+    <div class="stat-row">
+      <div style="text-align:center;"><div class="stat-num">24/7</div><div class="stat-label">Monitoring</div></div>
+      <div class="stat-divider"></div>
+      <div style="text-align:center;"><div class="stat-num">RT</div><div class="stat-label">Real-Time</div></div>
+      <div class="stat-divider"></div>
+      <div style="text-align:center;"><div class="stat-num">AI</div><div class="stat-label">Powered</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     LOGIN
+════════════════════════════════════ -->
+<div id="login" class="page">
+  <div class="grid-bg" style="opacity:0.35;"></div>
+  <div style="position:absolute;inset:0;background:radial-gradient(ellipse 60% 60% at 50% 50%,rgba(0,245,255,0.04) 0%,transparent 70%);"></div>
+  <div class="glass-card" style="width:100%;max-width:440px;padding:40px;margin:auto;position:relative;z-index:1;animation:fadeSlideUp 0.6s ease both;">
+    <div style="text-align:center;margin-bottom:36px;">
+      <div style="font-size:2rem;margin-bottom:8px;">⬡</div>
+      <div style="font-family:'Orbitron',monospace;font-size:1.5rem;font-weight:900;color:var(--cyan);text-shadow:var(--glow-sm);margin-bottom:4px;">NEXTRANSIT</div>
+      <div style="font-size:0.68rem;letter-spacing:3px;color:rgba(200,240,255,0.3);text-transform:uppercase;">Admin Portal Access</div>
+    </div>
+    <div id="loginError" class="error-box" style="margin-bottom:20px;"></div>
+    <div style="display:flex;flex-direction:column;gap:20px;">
+      <div>
+        <label class="label-text">Email Address</label>
+        <input id="emailInput" type="email" class="input-field" placeholder="admin@campus.edu" autocomplete="email" />
+      </div>
+      <div>
+        <label class="label-text">Password</label>
+        <input id="passInput" type="password" class="input-field" placeholder="••••••••••" autocomplete="current-password" />
+      </div>
+      <button id="loginBtn" class="btn-primary" onclick="handleLogin()">
+        <span id="loginBtnText">Authenticate</span>
+      </button>
+    </div>
+    <div style="text-align:center;margin-top:24px;font-size:0.75rem;color:rgba(200,240,255,0.2);">
+      🔒 Protected by Supabase Auth · TLS Encrypted
+    </div>
+    <div style="text-align:center;margin-top:12px;">
+      <button onclick="showPage('landing')" style="background:none;border:none;cursor:pointer;font-family:'Rajdhani',sans-serif;font-size:0.8rem;color:rgba(0,245,255,0.35);letter-spacing:1px;">← Back to Landing</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     DASHBOARD
+════════════════════════════════════ -->
+<div id="dashboard" class="page" style="flex-direction:row;">
+  <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">⬡ NexTransit</div>
+      <div class="sidebar-sub">Campus Transport Monitor</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" id="nav-overview" onclick="switchTab('overview')"><span class="icon">🏠</span><span>Overview</span></div>
+      <div class="nav-item" id="nav-logs"     onclick="switchTab('logs')"    ><span class="icon">📋</span><span>Entry / Exit Logs</span></div>
+      <div class="nav-item" id="nav-driver"   onclick="switchTab('driver')"  ><span class="icon">🧑‍✈️</span><span>Driver Info</span></div>
+      <div class="nav-item" id="nav-settings" onclick="switchTab('settings')"><span class="icon">⚙️</span><span>Settings</span></div>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="handleLogout()"><span>🚪</span><span>Logout</span></button>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content" id="mainContent">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <button class="hamburger" id="hamburger" onclick="openSidebar()">☰</button>
+        <div>
+          <div class="topbar-title" id="pageTitle">Overview</div>
+          <div style="font-size:0.68rem;letter-spacing:1px;color:rgba(200,240,255,0.28);text-transform:uppercase;" id="busTag">Bus: —</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        <div class="refresh-tag"><span class="pulse-dot pulse-green"></span>Live</div>
+        <div class="topbar-time" id="liveClock">—</div>
+      </div>
+    </div>
+
+    <!-- ── OVERVIEW TAB ── -->
+    <div class="sub-page active" id="tab-overview">
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon">🚌</div>
+          <div class="kpi-label">Current Status</div>
+          <div class="kpi-value" id="kpiStatus" style="font-size:1.4rem;">—</div>
+          <div class="kpi-sub" id="kpiStatusSub">Loading...</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">📥</div>
+          <div class="kpi-label">Total Entries Today</div>
+          <div class="kpi-value" id="kpiEntries">—</div>
+          <div class="kpi-sub">Entry events recorded</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">📤</div>
+          <div class="kpi-label">Total Exits Today</div>
+          <div class="kpi-value" id="kpiExits">—</div>
+          <div class="kpi-sub">Exit events recorded</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">🕐</div>
+          <div class="kpi-label">Last Detected</div>
+          <div class="kpi-value" id="kpiLastTime" style="font-size:1.05rem;">—</div>
+          <div class="kpi-sub" id="kpiLastStatus">No events yet</div>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="section-title">Today's Entry vs Exit Activity</div>
+        <div style="height:280px;"><canvas id="activityChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ── LOGS TAB ── -->
+    <div class="sub-page" id="tab-logs">
+      <div class="page-header-wrap">
+        <div class="section-title" style="margin-bottom:0;flex:1;">Entry / Exit Logs</div>
+        <div class="refresh-tag"><span class="pulse-dot pulse-green"></span>Real-Time</div>
+      </div>
+      <div class="filter-row">
+        <input type="date" id="filterDate" class="filter-input" onchange="renderLogs()" />
+        <select id="filterStatus" class="filter-input" onchange="renderLogs()">
+          <option value="">All Status</option>
+          <option value="ENTRY">ENTRY Only</option>
+          <option value="EXIT">EXIT Only</option>
+        </select>
+        <button class="clear-btn" onclick="clearFilters()">Clear</button>
+      </div>
+      <div class="table-wrap">
+        <table class="logs-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Timestamp</th>
+              <th>Status</th>
+              <th>Bus No.</th>
+            </tr>
+          </thead>
+          <tbody id="logsBody"><tr><td colspan="4" class="no-data">Loading logs...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── DRIVER TAB ── -->
+    <div class="sub-page" id="tab-driver">
+      <div class="section-title">Driver Information</div>
+      <div class="driver-card">
+        <div style="display:flex;align-items:center;flex-direction:column;text-align:center;margin-bottom:28px;">
+          <div class="avatar">🧑‍✈️</div>
+          <div class="driver-name-display" id="driverName">—</div>
+          <div style="margin-top:10px;" id="driverStatusBadge"></div>
+        </div>
+        <div class="driver-detail">
+          <span class="detail-label">Phone</span>
+          <span class="detail-value" id="driverPhone">—</span>
+        </div>
+        <div class="driver-detail">
+          <span class="detail-label">Bus No.</span>
+          <span class="detail-value" id="driverBus">—</span>
+        </div>
+        <div class="driver-detail">
+          <span class="detail-label">Account</span>
+          <span class="detail-value" id="driverEmail" style="font-size:0.75rem;word-break:break-all;">—</span>
+        </div>
+        <div class="driver-detail">
+          <span class="detail-label">User ID</span>
+          <span class="detail-value" id="driverUID" style="font-size:0.6rem;word-break:break-all;">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS TAB ── -->
+    <div class="sub-page" id="tab-settings">
+      <div class="section-title">System Settings</div>
+      <div class="settings-card">
+        <div style="margin-bottom:24px;">
+          <label class="label-text">Data Refresh Interval</label>
+          <select id="refreshInterval" class="filter-input" style="width:100%;" onchange="updateRefreshInterval()">
+            <option value="10000">Every 10 seconds</option>
+            <option value="30000">Every 30 seconds</option>
+            <option value="60000">Every 60 seconds</option>
+          </select>
+        </div>
+        <div style="margin-bottom:24px;">
+          <label class="label-text">Assigned Bus Number</label>
+          <input type="text" class="filter-input" style="width:100%;opacity:0.6;" id="settingsBusDisplay" disabled placeholder="—" />
+        </div>
+        <div style="margin-bottom:24px;">
+          <label class="label-text">Account Email</label>
+          <input type="text" class="filter-input" style="width:100%;opacity:0.6;" id="settingsEmail" disabled placeholder="—" />
+        </div>
+        <div style="padding-top:20px;border-top:1px solid var(--glass-border);display:flex;align-items:center;gap:10px;">
+          <div class="pulse-dot pulse-green"></div>
+          <span style="font-size:0.78rem;color:rgba(200,240,255,0.35);">Connected to Supabase · Real-Time Sync Active</span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ═══════════════════════════════════
+     SCRIPT
+════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ─────────────────────────────────────
+   CONSTANTS
+───────────────────────────────────── */
+const SUPABASE_URL     = "https://vrdogjarxdyykvuagzdt.supabase.co";
+const SUPABASE_ANON_KEY= "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZyZG9namFyeGR5eWt2dWFnemR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1ODI2NjMsImV4cCI6MjA4NzE1ODY2M30.dXN-3VYbSUX_K73CJjIiHxFHs_TqD_GhE-5PzZUW4iY";
+const TAB_TITLES = { overview: 'Overview', logs: 'Entry / Exit Logs', driver: 'Driver Info', settings: 'Settings' };
+
+/* ─────────────────────────────────────
+   STATE  (single source of truth)
+───────────────────────────────────── */
+const state = {
+  user:          null,
+  busNumber:     null,
+  busInfo:       null,
+  allLogs:       [],
+  chart:         null,
+  realtimeCh:    null,
+  fallbackTimer: null,
+  currentTab:    'overview',
+};
+
+/* ─────────────────────────────────────
+   SUPABASE CLIENT
+───────────────────────────────────── */
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ─────────────────────────────────────
+   UTILITIES
+───────────────────────────────────── */
+
+/** Switch visible top-level page */
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(name).classList.add('active');
+}
+
+/** Sidebar open / close */
+function openSidebar()  { document.getElementById('sidebar').classList.add('open');  document.getElementById('overlay').classList.add('open'); }
+function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('overlay').classList.remove('open'); }
+
+/** Switch dashboard tabs */
+function switchTab(tab) {
+  document.querySelectorAll('.sub-page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('nav-' + tab).classList.add('active');
+  state.currentTab = tab;
+  document.getElementById('pageTitle').textContent = TAB_TITLES[tab];
+  closeSidebar();
+}
+
+/** Live clock */
+function startClock() {
+  const el = document.getElementById('liveClock');
+  const tick = () => { el.textContent = new Date().toLocaleTimeString('en-US', { hour12: false }); };
+  tick();
+  setInterval(tick, 1000);
+}
+
+/**
+ * Return the UTC midnight boundaries for "today" in the client's local timezone,
+ * expressed as ISO strings. This makes today-filtering timezone-safe regardless
+ * of where the Supabase server stores timestamps.
+ */
+function getTodayUTCBounds() {
+  const now = new Date();
+  const localMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  const localMidnightEnd = new Date(localMidnight.getTime() + 86400000);
+  return { gte: localMidnight.toISOString(), lt: localMidnightEnd.toISOString() };
+}
+
+/** Format a timestamp string for display */
+function formatTimestamp(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return {
+    date: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+    time: d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    timeShort: d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+  };
+}
+
+/** Set element text content safely */
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = (val !== null && val !== undefined && val !== '') ? val : '—';
+}
+
+/* ─────────────────────────────────────
+   AUTH
+───────────────────────────────────── */
+
+async function handleLogin() {
+  const email = document.getElementById('emailInput').value.trim();
+  const pass  = document.getElementById('passInput').value;
+  const errEl = document.getElementById('loginError');
+  const btn   = document.getElementById('loginBtn');
+  const btnTx = document.getElementById('loginBtnText');
+
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btnTx.textContent = 'Authenticating...';
+
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if (error) throw error;
+    state.user = data.user;
+    await bootstrapDashboard();
+    showPage('dashboard');
+    startClock();
+  } catch (err) {
+    errEl.style.display = 'block';
+    errEl.textContent = err.message || 'Authentication failed.';
+  } finally {
+    btn.disabled = false;
+    btnTx.textContent = 'Authenticate';
+  }
+}
+
+async function handleLogout() {
+  teardownRealtime();
+  if (state.fallbackTimer) { clearInterval(state.fallbackTimer); state.fallbackTimer = null; }
+  await sb.auth.signOut();
+  state.user = null;
+  state.busNumber = null;
+  state.busInfo = null;
+  state.allLogs = [];
+  if (state.chart) { state.chart.destroy(); state.chart = null; }
+  showPage('login');
+}
+
+/* ─────────────────────────────────────
+   DATA FETCH
+───────────────────────────────────── */
+
+/** Load profile → bus_number, then bus info, then logs */
+async function bootstrapDashboard() {
+  const uid = state.user.id;
+
+  // 1. Profile → bus_number (RLS ensures user can only read their own row)
+  const { data: profile, error: profErr } = await sb
+    .from('profiles')
+    .select('bus_number, role')
+    .eq('id', uid)
+    .single();
+
+  if (profErr || !profile?.bus_number) {
+    showCriticalError('Profile not found or bus not assigned. Contact your administrator.');
+    return;
+  }
+  state.busNumber = profile.bus_number;
+
+  // 2. Bus + driver info from buses table
+  const { data: bus, error: busErr } = await sb
+    .from('buses')
+    .select('bus_number, driver_name, driver_phone')
+    .eq('bus_number', state.busNumber)
+    .single();
+
+  state.busInfo = (busErr || !bus) ? {} : bus;
+
+  // 3. Populate static UI fields
+  setText('busTag', `Bus: ${state.busNumber}`);
+  document.getElementById('settingsBusDisplay').value = state.busNumber || '';
+  document.getElementById('settingsEmail').value       = state.user.email || '';
+
+  // 4. Fetch all logs for this bus
+  await fetchLogs();
+
+  // 5. Render all tabs
+  renderOverview();
+  renderLogs();
+  populateDriver();
+
+  // 6. Start Supabase Realtime subscription
+  setupRealtime();
+}
+
+/**
+ * Fetch ALL logs for the assigned bus, ordered newest-first.
+ * Uses `timestamp` column (correct column per schema).
+ * RLS on the logs table ensures users can only read their own bus rows.
+ */
+async function fetchLogs() {
+  if (!state.busNumber) return;
+
+  const { data, error } = await sb
+    .from('logs')
+    .select('id, bus_number, status, timestamp')
+    .eq('bus_number', state.busNumber)
+    .order('timestamp', { ascending: false })
+    .limit(1000);
+
+  if (error) {
+    console.error('fetchLogs error:', error.message);
+    return;
+  }
+  state.allLogs = data || [];
+}
+
+/* ─────────────────────────────────────
+   REALTIME
+───────────────────────────────────── */
+
+function setupRealtime() {
+  teardownRealtime(); // ensure no duplicate subscriptions
+
+  state.realtimeCh = sb
+    .channel('logs-realtime')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'logs',
+        filter: `bus_number=eq.${state.busNumber}`,
+      },
+      async (payload) => {
+        // On any INSERT / UPDATE / DELETE, re-fetch and re-render
+        await fetchLogs();
+        renderOverview();
+        renderLogs();
+        populateDriver();
+      }
+    )
+    .subscribe();
+}
+
+function teardownRealtime() {
+  if (state.realtimeCh) {
+    sb.removeChannel(state.realtimeCh);
+    state.realtimeCh = null;
+  }
+}
+
+/** Called by the Settings refresh interval selector.
+ *  Realtime handles live updates; this selector controls how often
+ *  we do a full re-fetch poll as a fallback safety net. */
+function updateRefreshInterval() {
+  const ms = parseInt(document.getElementById('refreshInterval').value, 10);
+  if (state.fallbackTimer) clearInterval(state.fallbackTimer);
+  state.fallbackTimer = setInterval(async () => {
+    await fetchLogs();
+    renderOverview();
+    renderLogs();
+    populateDriver();
+  }, ms);
+}
+
+/* ─────────────────────────────────────
+   UI RENDERING — OVERVIEW
+───────────────────────────────────── */
+
+function renderOverview() {
+  const logs = state.allLogs;
+  const { gte, lt } = getTodayUTCBounds();
+
+  // Today's logs: timestamp >= local midnight AND < local midnight tomorrow
+  const todayLogs = logs.filter(l => l.timestamp && l.timestamp >= gte && l.timestamp < lt);
+  const todayEntries = todayLogs.filter(l => l.status === 'ENTRY').length;
+  const todayExits   = todayLogs.filter(l => l.status === 'EXIT').length;
+
+  // Current status is determined by the most recent log entry (logs are sorted newest-first)
+  const latest = logs[0] || null;
+  const currentStatus = latest
+    ? (latest.status === 'ENTRY' ? 'INSIDE' : 'OUTSIDE')
+    : null;
+
+  // KPI — Status
+  setText('kpiStatus',    currentStatus || '—');
+  setText('kpiStatusSub', currentStatus === 'INSIDE'
+    ? '🟢 Bus is on campus'
+    : currentStatus === 'OUTSIDE'
+      ? '🔴 Bus is off campus'
+      : 'No data available');
+
+  // KPI — Counts
+  setText('kpiEntries', todayEntries);
+  setText('kpiExits',   todayExits);
+
+  // KPI — Last detected
+  if (latest) {
+    const { time } = formatTimestamp(latest.timestamp);
+    setText('kpiLastTime',   time);
+    setText('kpiLastStatus', `Last event: ${latest.status}`);
+  } else {
+    setText('kpiLastTime',   'No data');
+    setText('kpiLastStatus', '—');
+  }
+
+  renderChart(todayEntries, todayExits);
+}
+
+/* ─────────────────────────────────────
+   UI RENDERING — CHART
+───────────────────────────────────── */
+
+function renderChart(entries, exits) {
+  const ctx = document.getElementById('activityChart');
+  if (!ctx) return;
+
+  if (state.chart) {
+    state.chart.data.datasets[0].data = [entries, exits];
+    state.chart.update('active');
+    return;
+  }
+
+  state.chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['ENTRY', 'EXIT'],
+      datasets: [{
+        label: 'Count Today',
+        data: [entries, exits],
+        backgroundColor: ['rgba(0,245,255,0.18)', 'rgba(255,80,80,0.18)'],
+        borderColor:     ['rgba(0,245,255,0.85)', 'rgba(255,80,80,0.85)'],
+        borderWidth: 2,
+        borderRadius: 8,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(6,15,36,0.96)',
+          borderColor: 'rgba(0,245,255,0.3)',
+          borderWidth: 1,
+          titleColor: '#00f5ff',
+          bodyColor:  '#e0f7fa',
+          titleFont:  { family: 'Orbitron', size: 11 },
+        },
+      },
+      scales: {
+        x: {
+          grid:   { color: 'rgba(0,245,255,0.05)' },
+          ticks:  { color: 'rgba(200,240,255,0.45)', font: { family: 'Orbitron', size: 11 } },
+          border: { color: 'rgba(0,245,255,0.1)' },
+        },
+        y: {
+          grid:      { color: 'rgba(0,245,255,0.05)' },
+          ticks:     { color: 'rgba(200,240,255,0.45)', font: { family: 'Rajdhani', size: 12 }, stepSize: 1 },
+          border:    { color: 'rgba(0,245,255,0.1)' },
+          beginAtZero: true,
+        },
+      },
+      animation: { duration: 600, easing: 'easeOutQuart' },
+    },
+  });
+}
+
+/* ─────────────────────────────────────
+   UI RENDERING — LOGS TABLE
+───────────────────────────────────── */
+
+function clearFilters() {
+  document.getElementById('filterDate').value   = '';
+  document.getElementById('filterStatus').value = '';
+  renderLogs();
+}
+
+function renderLogs() {
+  const dateFilter   = document.getElementById('filterDate').value;    // "YYYY-MM-DD" or ""
+  const statusFilter = document.getElementById('filterStatus').value;  // "ENTRY", "EXIT", or ""
+
+  let logs = state.allLogs;
+
+  // Date filter: compare against local date portion of timestamp
+  if (dateFilter) {
+    logs = logs.filter(l => {
+      if (!l.timestamp) return false;
+      // Convert to local date string "YYYY-MM-DD" for comparison
+      const localDate = new Date(l.timestamp).toLocaleDateString('en-CA'); // en-CA gives YYYY-MM-DD
+      return localDate === dateFilter;
+    });
+  }
+
+  if (statusFilter) {
+    logs = logs.filter(l => l.status === statusFilter);
+  }
+
+  const tbody = document.getElementById('logsBody');
+
+  if (!logs.length) {
+    tbody.innerHTML = `<tr><td colspan="4" class="no-data">No logs found</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = logs.map((l, i) => {
+    const { date, time } = formatTimestamp(l.timestamp);
+    const isEntry = l.status === 'ENTRY';
+    const badge = isEntry
+      ? `<span class="badge badge-entry"><span class="pulse-dot pulse-green" style="margin-right:0;"></span>${l.status}</span>`
+      : `<span class="badge badge-exit"><span class="pulse-dot pulse-red"   style="margin-right:0;"></span>${l.status}</span>`;
+    return `
+      <tr style="animation:fadeIn 0.25s ${Math.min(i * 0.02, 0.4)}s ease both;">
+        <td style="color:rgba(200,240,255,0.22);font-size:0.72rem;font-family:'Orbitron',monospace;">${String(i + 1).padStart(3, '0')}</td>
+        <td>
+          <span style="color:rgba(200,240,255,0.5);">${date}</span>
+          <span style="font-family:'Orbitron',monospace;font-size:0.78rem;color:var(--cyan);margin-left:8px;">${time}</span>
+        </td>
+        <td>${badge}</td>
+        <td style="font-family:'Orbitron',monospace;color:var(--cyan2);">${l.bus_number || '—'}</td>
+      </tr>`;
+  }).join('');
+}
+
+/* ─────────────────────────────────────
+   UI RENDERING — DRIVER TAB
+───────────────────────────────────── */
+
+function populateDriver() {
+  const bus    = state.busInfo   || {};
+  const latest = state.allLogs[0] || null;
+
+  // Driver info sourced from buses table (correct per schema)
+  setText('driverName',  bus.driver_name);
+  setText('driverPhone', bus.driver_phone);
+  setText('driverBus',   state.busNumber);
+  setText('driverEmail', state.user?.email);
+  setText('driverUID',   state.user?.id);
+
+  // Current status badge
+  const badgeEl = document.getElementById('driverStatusBadge');
+  if (latest) {
+    const inside = latest.status === 'ENTRY';
+    badgeEl.innerHTML = `<span class="badge ${inside ? 'badge-inside' : 'badge-exit'}">${inside ? '🟢 INSIDE CAMPUS' : '🔴 OUTSIDE CAMPUS'}</span>`;
+  } else {
+    badgeEl.innerHTML = `<span class="badge" style="border-color:rgba(200,240,255,0.2);color:rgba(200,240,255,0.35);">No Data Available</span>`;
+  }
+}
+
+/* ─────────────────────────────────────
+   ERROR STATE
+───────────────────────────────────── */
+
+function showCriticalError(msg) {
+  const main = document.getElementById('mainContent');
+  main.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:60vh;">
+    <div style="background:rgba(255,50,50,0.08);border:1px solid rgba(255,80,80,0.25);border-radius:12px;padding:32px 40px;text-align:center;max-width:440px;">
+      <div style="font-size:2rem;margin-bottom:12px;">⚠️</div>
+      <div style="font-family:'Orbitron',monospace;color:#ff8080;font-size:0.85rem;letter-spacing:1px;">${msg}</div>
+    </div>
+  </div>`;
+}
+
+/* ─────────────────────────────────────
+   EVENT LISTENERS
+───────────────────────────────────── */
+
+document.getElementById('passInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleLogin();
+});
+document.getElementById('emailInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleLogin();
+});
+
+/* ─────────────────────────────────────
+   AUTO RESTORE SESSION ON LOAD
+───────────────────────────────────── */
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) {
+    state.user = session.user;
+    await bootstrapDashboard();
+    showPage('dashboard');
+    startClock();
+  }
+})();
+</script>
+</body>
+</html>
